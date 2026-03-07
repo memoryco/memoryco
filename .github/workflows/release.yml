@@ -127,7 +127,7 @@ jobs:
         run: |
           echo "REPO_URL=${{ secrets.MEMORY_REPO }}" >> "$GITHUB_ENV"
           mkdir -p ~/.ssh
-          echo "$KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
         env:
           KEY: ${{ secrets.MEMORY_REPO_SSH_KEY }}
@@ -137,7 +137,7 @@ jobs:
         run: |
           echo "REPO_URL=${{ secrets.FILESYSTEM_REPO }}" >> "$GITHUB_ENV"
           mkdir -p ~/.ssh
-          echo "$KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
         env:
           KEY: ${{ secrets.FILESYSTEM_REPO_SSH_KEY }}
@@ -147,7 +147,7 @@ jobs:
         run: |
           echo "REPO_URL=${{ secrets.AGENTS_REPO }}" >> "$GITHUB_ENV"
           mkdir -p ~/.ssh
-          echo "$KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
         env:
           KEY: ${{ secrets.AGENTS_REPO_SSH_KEY }}

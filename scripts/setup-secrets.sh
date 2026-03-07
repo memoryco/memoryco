@@ -75,11 +75,15 @@ chmod 700 "$KEY_DIR"
 
 setup_binary() {
     local name="$1"           # e.g., "memory"
-    local repo_url="$2"       # e.g., "git@github.com:memoryco/memory.git"
+    local repo_url="$2"       # e.g., "git@github.com:MemoryCo/memory.git"
     local secret_repo="$3"    # e.g., "MEMORY_REPO"
     local secret_key="$4"     # e.g., "MEMORY_REPO_SSH_KEY"
 
-    info "Setting up ${BOLD}${name}${RESET}..."
+    # Extract "MemoryCo/memory" from the git URL
+    local source_repo
+    source_repo=$(echo "$repo_url" | sed 's|git@github.com:||;s|\.git$||')
+
+    info "Setting up ${BOLD}${name}${RESET} (${source_repo})..."
 
     local key_path="${KEY_DIR}/${name}_deploy_key"
 
@@ -91,21 +95,38 @@ setup_binary() {
         ok "Generated deploy key: ${key_path}"
     fi
 
-    # Set the repo URL secret
+    # Set the repo URL secret on the dist repo
     printf "%s" "$repo_url" | gh secret set "$secret_repo" --repo "$DIST_REPO" --body -
     ok "Set secret ${secret_repo}"
 
-    # Set the SSH key secret
+    # Set the SSH key secret on the dist repo
     gh secret set "$secret_key" --repo "$DIST_REPO" < "$key_path"
     ok "Set secret ${secret_key}"
 
-    # Print the public key for manual step
-    printf "\n"
-    printf "  ${YELLOW}ACTION REQUIRED:${RESET} Add this deploy key to the ${BOLD}${name}${RESET} source repo:\n"
-    printf "  ${DIM}Go to: https://github.com/%s/settings/keys${RESET}\n" "$(echo "$repo_url" | sed 's|git@github.com:||;s|\.git$||')"
-    printf "  ${DIM}Title: memoryco-dist-deploy${RESET}\n"
-    printf "  ${DIM}Key:${RESET}\n\n"
-    printf "    %s\n\n" "$(cat "${key_path}.pub")"
+    # Add the public key as a deploy key on the source repo
+    local pub_key
+    pub_key=$(cat "${key_path}.pub")
+
+    # Check if a deploy key with this title already exists
+    local existing_key_id
+    existing_key_id=$(gh api "repos/${source_repo}/keys" --jq '.[] | select(.title == "memoryco-dist-deploy") | .id' 2>/dev/null || true)
+
+    if [ -n "$existing_key_id" ]; then
+        # Remove the old one so we can replace it
+        gh api --method DELETE "repos/${source_repo}/keys/${existing_key_id}" --silent 2>/dev/null || true
+    fi
+
+    if gh api --method POST "repos/${source_repo}/keys" \
+        -f title="memoryco-dist-deploy" \
+        -f key="${pub_key}" \
+        -F read_only=true \
+        --silent 2>/dev/null; then
+        ok "Deploy key added to ${source_repo}"
+    else
+        warn "Could not add deploy key to ${source_repo} — add it manually:"
+        printf "  ${DIM}Go to: https://github.com/%s/settings/keys${RESET}\n" "$source_repo"
+        printf "  ${DIM}Key:${RESET} %s\n\n" "$pub_key"
+    fi
 }
 
 setup_binary "memory"     "$MEMORY_REPO_URL"     "MEMORY_REPO"     "MEMORY_REPO_SSH_KEY"
@@ -118,5 +139,5 @@ printf "${DIM}──────────────────────
 info "Verifying secrets on ${DIST_REPO}..."
 gh secret list --repo "$DIST_REPO"
 
-printf "\n${GREEN}✓${RESET} Secrets configured. Don't forget to add the public keys as deploy keys!\n"
-printf "${DIM}Keys stored in: ${KEY_DIR}${RESET}\n\n"
+printf "\n${GREEN}✓${RESET} All done! Secrets set and deploy keys added.\n"
+printf "${DIM}Keys stored locally in: ${KEY_DIR}${RESET}\n\n"
