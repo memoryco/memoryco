@@ -159,6 +159,18 @@ jobs:
             git clone --depth 1 "$REPO_URL" source
           rm -f ~/.ssh/deploy_key
 
+      # Clone path dependencies that live in sibling repos.
+      # The updater is needed by all binaries. sml_mcps is needed by agents.
+      # These are public repos — no deploy key required.
+      - name: Clone path dependencies
+        run: |
+          git clone --depth 1 https://github.com/MemoryCo/updater.git updater
+
+      - name: Clone sml_mcps (agents only)
+        if: needs.determine.outputs.binary_name == 'memoryco_agents'
+        run: |
+          git clone --depth 1 https://github.com/MemoryCo/sml_mcps.git sml_mcps
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
