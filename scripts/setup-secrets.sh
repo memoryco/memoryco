@@ -96,7 +96,7 @@ setup_binary() {
     fi
 
     # Set the repo URL secret on the dist repo
-    printf "%s" "$repo_url" | gh secret set "$secret_repo" --repo "$DIST_REPO" --body -
+    gh secret set "$secret_repo" --repo "$DIST_REPO" -b "$repo_url"
     ok "Set secret ${secret_repo}"
 
     # Set the SSH key secret on the dist repo
