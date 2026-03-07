@@ -229,13 +229,11 @@ esac
 printf "\n"
 info "Updating Cargo.toml..."
 
-# Use sed to replace the version line (first occurrence only)
-if [ "$(uname)" = "Darwin" ]; then
-    # macOS sed needs -i ''
-    sed -i '' "0,/^version = \"${CURRENT_VERSION}\"/s//version = \"${VERSION}\"/" "$CARGO_TOML"
-else
-    sed -i "0,/^version = \"${CURRENT_VERSION}\"/s//version = \"${VERSION}\"/" "$CARGO_TOML"
-fi
+# Replace the first version line only (portable — works on macOS and Linux)
+awk -v old="$CURRENT_VERSION" -v new="$VERSION" '
+    !done && /^version = "/ { sub("version = \"" old "\"", "version = \"" new "\""); done=1 }
+    { print }
+' "$CARGO_TOML" > "${CARGO_TOML}.tmp" && mv "${CARGO_TOML}.tmp" "$CARGO_TOML"
 
 # Verify the change
 NEW_VERSION=$(cargo_version "$CARGO_TOML")
