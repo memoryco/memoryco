@@ -118,32 +118,42 @@ jobs:
         uses: actions/checkout@v4
 
       # GitHub Actions doesn't support dynamic secret names, so we use
-      # conditional steps to load the correct repo URL and deploy key
-      # into environment variables based on the binary being built.
+      # conditional steps to set REPO_URL and write the deploy key to
+      # a file. The SSH key is multi-line so it can't go into GITHUB_ENV
+      # with a simple echo — we write it to ~/.ssh/deploy_key directly.
 
       - name: Select repo credentials (memoryco)
         if: needs.determine.outputs.binary_name == 'memoryco'
         run: |
-          echo "REPO_URL=${{ secrets.MEMORY_REPO }}"         >> "$GITHUB_ENV"
-          echo "DEPLOY_KEY=${{ secrets.MEMORY_REPO_SSH_KEY }}" >> "$GITHUB_ENV"
+          echo "REPO_URL=${{ secrets.MEMORY_REPO }}" >> "$GITHUB_ENV"
+          mkdir -p ~/.ssh
+          echo "$KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+        env:
+          KEY: ${{ secrets.MEMORY_REPO_SSH_KEY }}
 
       - name: Select repo credentials (memoryco_fs)
         if: needs.determine.outputs.binary_name == 'memoryco_fs'
         run: |
-          echo "REPO_URL=${{ secrets.FILESYSTEM_REPO }}"             >> "$GITHUB_ENV"
-          echo "DEPLOY_KEY=${{ secrets.FILESYSTEM_REPO_SSH_KEY }}" >> "$GITHUB_ENV"
+          echo "REPO_URL=${{ secrets.FILESYSTEM_REPO }}" >> "$GITHUB_ENV"
+          mkdir -p ~/.ssh
+          echo "$KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+        env:
+          KEY: ${{ secrets.FILESYSTEM_REPO_SSH_KEY }}
 
       - name: Select repo credentials (memoryco_agents)
         if: needs.determine.outputs.binary_name == 'memoryco_agents'
         run: |
-          echo "REPO_URL=${{ secrets.AGENTS_REPO }}"             >> "$GITHUB_ENV"
-          echo "DEPLOY_KEY=${{ secrets.AGENTS_REPO_SSH_KEY }}" >> "$GITHUB_ENV"
+          echo "REPO_URL=${{ secrets.AGENTS_REPO }}" >> "$GITHUB_ENV"
+          mkdir -p ~/.ssh
+          echo "$KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+        env:
+          KEY: ${{ secrets.AGENTS_REPO_SSH_KEY }}
 
       - name: Clone source
         run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
           ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
           GIT_SSH_COMMAND="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             git clone --depth 1 "$REPO_URL" source
