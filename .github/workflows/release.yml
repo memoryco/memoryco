@@ -267,9 +267,18 @@ jobs:
 
           # Include the relevant install script as a release asset
           case "$BINARY_NAME" in
-            memoryco)        cp "${GITHUB_WORKSPACE}/install.sh" . ;;
-            memoryco_fs)     cp "${GITHUB_WORKSPACE}/install_fs.sh" . ;;
-            memoryco_agents) cp "${GITHUB_WORKSPACE}/install_agents.sh" . ;;
+            memoryco)
+              cp "${GITHUB_WORKSPACE}/install.sh" .
+              echo "INSTALL_CMD=curl -fsSL https://memoryco.ai/install.sh | sh" >> "$GITHUB_ENV"
+              ;;
+            memoryco_fs)
+              cp "${GITHUB_WORKSPACE}/install_fs.sh" .
+              echo "INSTALL_CMD=curl -fsSL https://memoryco.ai/install_fs.sh | sh" >> "$GITHUB_ENV"
+              ;;
+            memoryco_agents)
+              cp "${GITHUB_WORKSPACE}/install_agents.sh" .
+              echo "INSTALL_CMD=curl -fsSL https://memoryco.ai/install_agents.sh | sh" >> "$GITHUB_ENV"
+              ;;
           esac
 
           echo "=== Release files ==="
@@ -292,7 +301,7 @@ jobs:
             ### Install
 
             ```bash
-            curl -fsSL https://memoryco.ai/install.sh | sh
+            ${{ env.INSTALL_CMD }}
             ```
 
             Or download the binary for your platform below.
