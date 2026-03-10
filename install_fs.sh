@@ -116,23 +116,28 @@ resolve_version() {
 
     info "Fetching latest version..."
 
-    # GitHub redirects /latest to the actual tag URL
-    local latest_url="${BASE_URL}/latest"
-    local resolved
+    # Query GitHub API for releases tagged with our binary name prefix
+    local api_url="https://api.github.com/repos/${REPO}/releases"
+    local tag
 
     if [ "$DOWNLOADER" = "curl" ]; then
-        resolved=$(curl -fsSL -o /dev/null -w '%{url_effective}' "$latest_url" 2>/dev/null)
+        tag=$(curl -fsSL "$api_url" 2>/dev/null \
+            | grep -o '"tag_name":"'"${BINARY_NAME}"'-v[^"]*"' \
+            | head -1 \
+            | grep -oE "${BINARY_NAME}-v[0-9]+\\.[0-9]+\\.[0-9]+[a-zA-Z0-9._-]*")
     else
-        resolved=$(wget --max-redirect=0 -q -O /dev/null --server-response "$latest_url" 2>&1 \
-            | grep -i "Location:" | tail -1 | awk '{print $2}' | tr -d '\r')
+        tag=$(wget -qO- "$api_url" 2>/dev/null \
+            | grep -o '"tag_name":"'"${BINARY_NAME}"'-v[^"]*"' \
+            | head -1 \
+            | grep -oE "${BINARY_NAME}-v[0-9]+\\.[0-9]+\\.[0-9]+[a-zA-Z0-9._-]*")
     fi
 
-    if [ -z "$resolved" ]; then
+    if [ -z "$tag" ]; then
         fail "Could not determine latest version. Set MEMORYCO_FS_VERSION and try again."
     fi
 
-    # Extract tag from URL: .../releases/tag/memoryco_fs-v1.0.0 -> v1.0.0
-    echo "$resolved" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9._-]*' | tail -1
+    # Extract version from tag: memoryco_fs-v0.9.1 -> v0.9.1
+    echo "v${tag##*-v}"
 }
 
 # ─── Checksum verification ──────────────────────────────────────────────────
@@ -188,10 +193,12 @@ main() {
     info "Version:  ${BOLD}${VERSION}${RESET}"
 
     # Build download URLs
+    # Tags are prefixed with binary name: memoryco_fs-v0.9.1
+    TAG="${BINARY_NAME}-${VERSION}"
     ARCHIVE_NAME="${BINARY_NAME}-${VERSION}-${TARGET}.tar.gz"
     CHECKSUMS_NAME="${BINARY_NAME}-${VERSION}-checksums.sha256"
-    DOWNLOAD_URL="${BASE_URL}/download/${VERSION}/${ARCHIVE_NAME}"
-    CHECKSUMS_URL="${BASE_URL}/download/${VERSION}/${CHECKSUMS_NAME}"
+    DOWNLOAD_URL="${BASE_URL}/download/${TAG}/${ARCHIVE_NAME}"
+    CHECKSUMS_URL="${BASE_URL}/download/${TAG}/${CHECKSUMS_NAME}"
 
     # Create temp directory
     TMP_DIR=$(mktemp -d)
