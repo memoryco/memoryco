@@ -203,12 +203,12 @@ resolve_companion_version() {
 
     if [ "$DOWNLOADER" = "curl" ]; then
         tag=$(curl -fsSL "$api_url" 2>/dev/null \
-            | grep -o "\"tag_name\":\"${binary}-v[^\"]*\"" \
+            | grep -o "\"tag_name\" *: *\"${binary}-v[^\"]*\"" \
             | head -1 \
             | grep -oE "${binary}-v[0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9._-]*")
     else
         tag=$(wget -qO- "$api_url" 2>/dev/null \
-            | grep -o "\"tag_name\":\"${binary}-v[^\"]*\"" \
+            | grep -o "\"tag_name\" *: *\"${binary}-v[^\"]*\"" \
             | head -1 \
             | grep -oE "${binary}-v[0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9._-]*")
     fi

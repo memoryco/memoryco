@@ -122,12 +122,12 @@ resolve_version() {
 
     if [ "$DOWNLOADER" = "curl" ]; then
         tag=$(curl -fsSL "$api_url" 2>/dev/null \
-            | grep -o '"tag_name":"'"${BINARY_NAME}"'-v[^"]*"' \
+            | grep -o '"tag_name" *: *"'"${BINARY_NAME}"'-v[^"]*"' \
             | head -1 \
             | grep -oE "${BINARY_NAME}-v[0-9]+\\.[0-9]+\\.[0-9]+[a-zA-Z0-9._-]*")
     else
         tag=$(wget -qO- "$api_url" 2>/dev/null \
-            | grep -o '"tag_name":"'"${BINARY_NAME}"'-v[^"]*"' \
+            | grep -o '"tag_name" *: *"'"${BINARY_NAME}"'-v[^"]*"' \
             | head -1 \
             | grep -oE "${BINARY_NAME}-v[0-9]+\\.[0-9]+\\.[0-9]+[a-zA-Z0-9._-]*")
     fi
