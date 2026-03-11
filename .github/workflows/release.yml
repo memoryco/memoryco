@@ -15,12 +15,8 @@
 #   git tag memoryco_agents-v0.2.1 && git push origin memoryco_agents-v0.2.1
 #
 # Required secrets:
-#   MEMORY_REPO             - Clone URL for memoryco private source repo
-#   MEMORY_REPO_SSH_KEY     - Deploy key with read access
-#   FILESYSTEM_REPO         - Clone URL for memoryco_fs private source repo
-#   FILESYSTEM_REPO_SSH_KEY - Deploy key with read access
-#   AGENTS_REPO             - Clone URL for memoryco_agents private source repo
-#   AGENTS_REPO_SSH_KEY     - Deploy key with read access
+#   MEMORYCO_APP_ID          - GitHub App ID (org-level)
+#   MEMORYCO_APP_PRIVATE_KEY - GitHub App private key (PEM)
 
 name: Release
 
@@ -117,54 +113,47 @@ jobs:
       - name: Checkout dist repo
         uses: actions/checkout@v4
 
-      # GitHub Actions doesn't support dynamic secret names, so we use
-      # conditional steps to set REPO_URL and write the deploy key to
-      # a file. The SSH key is multi-line so it can't go into GITHUB_ENV
-      # with a simple echo — we write it to ~/.ssh/deploy_key directly.
+      # Generate a short-lived GitHub App installation token that grants
+      # read access to all private repos in the MemoryCo org. This replaces
+      # per-repo deploy keys — one token covers source repos, the design
+      # crate git dep, and any future private dependencies.
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.MEMORYCO_APP_ID }}
+          private-key: ${{ secrets.MEMORYCO_APP_PRIVATE_KEY }}
+          owner: memoryco
 
-      - name: Select repo credentials (memoryco)
-        if: needs.determine.outputs.binary_name == 'memoryco'
+      # Rewrite all github.com URLs to use the App token over HTTPS.
+      # This covers:
+      #   - Explicit git clones (source repos, path deps)
+      #   - Cargo's implicit fetch of private git deps (e.g. memoryco_design)
+      #   - Both SSH and HTTPS URL styles
+      - name: Configure git auth for private repos
         run: |
-          echo "REPO_URL=${{ secrets.MEMORY_REPO }}" >> "$GITHUB_ENV"
-          mkdir -p ~/.ssh
-          printf '%s\n' "$KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-        env:
-          KEY: ${{ secrets.MEMORY_REPO_SSH_KEY }}
+          TOKEN="${{ steps.app-token.outputs.token }}"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "git@github.com:"
+          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
 
-      - name: Select repo credentials (memoryco_fs)
-        if: needs.determine.outputs.binary_name == 'memoryco_fs'
-        run: |
-          echo "REPO_URL=${{ secrets.FILESYSTEM_REPO }}" >> "$GITHUB_ENV"
-          mkdir -p ~/.ssh
-          printf '%s\n' "$KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-        env:
-          KEY: ${{ secrets.FILESYSTEM_REPO_SSH_KEY }}
-
-      - name: Select repo credentials (memoryco_agents)
-        if: needs.determine.outputs.binary_name == 'memoryco_agents'
-        run: |
-          echo "REPO_URL=${{ secrets.AGENTS_REPO }}" >> "$GITHUB_ENV"
-          mkdir -p ~/.ssh
-          printf '%s\n' "$KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-        env:
-          KEY: ${{ secrets.AGENTS_REPO_SSH_KEY }}
-
+      # Map binary name → source repo
       - name: Clone source
         run: |
-          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
-          GIT_SSH_COMMAND="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            git clone --depth 1 "$REPO_URL" source
-          rm -f ~/.ssh/deploy_key
+          case "$BINARY_NAME" in
+            memoryco)        REPO="MemoryCo/memory" ;;
+            memoryco_fs)     REPO="MemoryCo/filesystem" ;;
+            memoryco_agents) REPO="MemoryCo/agents" ;;
+          esac
+          git clone --depth 1 "https://github.com/${REPO}.git" source
 
       # Clone path dependencies that live in sibling repos.
-      # The updater is needed by all binaries. sml_mcps is needed by agents.
-      # These are public repos — no deploy key required.
+      # All clones go through the App token's HTTPS rewrite automatically,
+      # so both public and private repos just work.
       - name: Clone path dependencies
         run: |
           git clone --depth 1 https://github.com/MemoryCo/updater.git updater
+          git clone --depth 1 https://github.com/MemoryCo/llm.git llm
 
       - name: Clone sml_mcps (agents only)
         if: needs.determine.outputs.binary_name == 'memoryco_agents'
