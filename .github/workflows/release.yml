@@ -161,6 +161,19 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/MemoryCo/sml_mcps.git sml_mcps
 
+      # Rewrite any SSH git deps in Cargo.toml to use HTTPS + App token.
+      # This is more reliable than git insteadOf in CI where checkout@v4
+      # may interfere with global git config.
+      - name: Rewrite private git deps to HTTPS
+        run: |
+          TOKEN="${{ steps.app-token.outputs.token }}"
+          for f in source/Cargo.toml source/Cargo.lock; do
+            if [ -f "$f" ]; then
+              sed -i.bak "s|ssh://git@github.com/|https://x-access-token:${TOKEN}@github.com/|g" "$f"
+              rm -f "${f}.bak"
+            fi
+          done
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
